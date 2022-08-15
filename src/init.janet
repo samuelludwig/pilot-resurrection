@@ -113,28 +113,53 @@ segments, or script arguments, or both
   [target]
   (first (split-into-path-and-args target)))
 
-(defn run-cat
-  [path]
-  (os/execute [(config :cat-provider) (mainpath-of path)] :p))
+# TODO: I think help should its own separate program, it feels/can be more
+# general. I could then call to it here.
+#(defn run-help [segments] nil)
 
-(defn run-edit [path] (open-in-editor path))
+(defn run-new
+  [segments]
+  (let [path (fs/pathify ;segments)
+        stock-template "#!/usr/bin/env sh"]
+    (fs/create-executable path stock-template)
+    (open-in-editor path)))
+
+(defn run-cat
+  [segments]
+  (let [path (fs/pathify ;segments)]
+    (os/execute [(config :cat-provider) (mainpath-of path)] :p)))
+
+(defn run-edit [segments]
+  (open-in-editor
+    (fs/pathify ;segments)))
 
 (defn run-which
-  [path]
-  (os/execute ["echo" path] :p))
+  [segments]
+  (let [path (fs/pathify ;segments)]
+    (os/execute ["echo" path] :p)))
 
-(defn run-script [target]
-  (let [[path args] (split-into-path-and-args target)]
+(defn run-script [args]
+  (let [[path args] (split-into-path-and-args args)]
     (cond
-      #(fs/entity-does-not-exist? path) (run-help target)
-      #(fs/dir? path) (run-help target)
+      (fs/entity-does-not-exist? path) (do
+                                         (print "File not found:" path)
+                                         (os/exit 1))
+      (fs/dir? path) (os/execute ["ls" path] :p)
       (fs/not-executable? path) (run-cat path)
       (os/execute [path ;args] :p))))
+
+# Think it would be nice to have default behaviors for new, cat, which, help,
+# etc. and allow the user to override them with their own implementations. TODO
+#
+# We should then also provide a facility that will alert whats being
+# overridden.
 
 (defn main
   [this-file & args]
   (let [script-dir (config :script-dir)]
-    (cond
-      #(= (first args) "which") (run-which [script-dir ;(rest args)])
-      #(= (first args) "cat") (run-cat [script-dir ;(rest args)])
-      :default (run-script [script-dir ;args]))))
+    (case (first args)
+      "which" (run-which [script-dir ;(rest args)])
+      "cat" (run-cat [script-dir ;(rest args)])
+      "edit" (run-edit [script-dir ;(rest args)])
+      "new" (run-new [script-dir ;(rest args)])
+      (run-script [script-dir ;args]))))

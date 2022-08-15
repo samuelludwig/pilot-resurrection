@@ -3,3 +3,5 @@ build
 repl.sh
 pi.c
 pi
+.clj-kondo/.cache/v1
+.lsp/.cache
